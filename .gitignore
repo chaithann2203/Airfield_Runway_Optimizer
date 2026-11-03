@@ -1,0 +1,7 @@
+# Compiled binaries
+*.exe
+server
+*.o
+
+# VS Code config
+.vscode/

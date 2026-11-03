@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Airfield Runway & Surface Movement Simulator</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --border: #1e293b;
+      --accent: #00f0ff;
+      --accent-glow: rgba(0, 240, 255, 0.2);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.15);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --text: #f3f4f6;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 18px 24px; min-height: 100vh; display: flex; flex-direction: column; gap: 16px; }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-title h1 {
+      font-size: 1.35rem;
+      letter-spacing: 0.5px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-title h1 span { color: var(--accent); }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge {
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #334155;
+    }
+
+    /* Main Grid Layout */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding-bottom: 8px;
+    }
+    .card-header h2 {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-header h2::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    /* Airfield Topology (Dominant Center Stage) */
+    .airfield-card {
+      grid-column: 1 / 2;
+      min-height: 380px;
+    }
+    .canvas-wrap {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(circle at center, #131d31 0%, #0c1220 100%);
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      overflow: hidden;
+      min-height: 320px;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: pointer;
+    }
+    .canvas-hint {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Controls Panel */
+    .controls-card {
+      grid-column: 2 / 3;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-group label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    input, select {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: white;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .btn-primary {
+      background: #0284c7;
+      color: white;
+    }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-action {
+      background: #059669;
+      color: white;
+      font-size: 0.95rem;
+      padding: 12px;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3);
+    }
+    .btn-action:hover { background: #047857; }
+
+    /* Queue Table Card */
+    .queue-card {
+      grid-column: 1 / 2;
+    }
+    .table-container {
+      max-height: 200px;
+      overflow-y: auto;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      text-align: left;
+    }
+    th {
+      background: #1e293b;
+      color: #94a3b8;
+      font-weight: 600;
+      padding: 8px 12px;
+      position: sticky;
+      top: 0;
+    }
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #1e293b;
+    }
+    tr.critical-row {
+      background: var(--danger-bg);
+      color: #fca5a5;
+      font-weight: 600;
+    }
+
+    /* Log Box */
+    .log-card {
+      grid-column: 2 / 3;
+    }
+    .log-box {
+      height: 200px;
+      overflow-y: auto;
+      background: #050811;
+      padding: 10px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 0.75rem;
+      border: 1px solid #1e293b;
+    }
+    .log-item {
+      margin-bottom: 6px;
+      color: #34d399;
+      line-height: 1.4;
+    }
+    .log-item.alert { color: var(--danger); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">
+      <h1>AIRPORT ATC <span>RUNWAY & TAXIWAY OPTIMIZER</span></h1>
+    </div>
+  </header>
+
+  <div class="dashboard-layout">
+    <!-- AIRFIELD VISUALIZER (TOP LEFT) -->
+    <div class="card airfield-card">
+      <div class="card-header">
+        <h2>Live Airfield Ground Topology</h2>
+        <span style="font-size:0.75rem; color:var(--accent);">Interactive Network</span>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="airfieldCanvas"></canvas>
+      </div>
+      <div class="canvas-hint">
+        ⚡ <span>Click any taxiway line or weight badge to simulate a <b>runway/taxiway blockage</b>. Dijkstra recalculates dynamically.</span>
+      </div>
+    </div>
+
+    <!-- CONTROLS & DISPATCH (TOP RIGHT) -->
+    <div class="card controls-card">
+      <div class="card-header">
+        <h2>Aircraft Dispatch & Operations</h2>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Flight ID</label>
+          <input type="text" id="flightId" value="6E-404">
+        </div>
+        <div class="form-group">
+          <label>Fuel (Mins)</label>
+          <input type="number" id="fuelTime" value="22">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Delay (Mins)</label>
+          <input type="number" id="delayTime" value="15">
+        </div>
+        <div class="form-group">
+          <label>Pax Count</label>
+          <input type="number" id="passengers" value="180">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Emergency Override</label>
+        <select id="emergency">
+          <option value="1">Routine Flight (Score: 1)</option>
+          <option value="10">🚨 MAYDAY: Low Fuel / Medical (Score: 10)</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" onclick="addOrUpdateFlight()">Queue / Update Flight </button>
+
+      <div style="border-top: 1px solid var(--border); margin: 6px 0;"></div>
+
+      <div class="form-group">
+        <label>Destination Gate</label>
+        <select id="gateSelect">
+          <option value="3">Gate 10 (Domestic)</option>
+          <option value="4">Gate 12 (International)</option>
+        </select>
+      </div>
+      <button class="btn btn-action" onclick="landTopFlight()">Authorize Next Landing & Taxi</button>
+    </div>
+
+    <!-- LIVE QUEUE TABLE (BOTTOM LEFT) -->
+    <div class="card queue-card">
+      <div class="card-header">
+        <h2>Active Runway Queue </h2>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Flight</th>
+              <th>Fuel</th>
+              <th>Delay</th>
+              <th>Pax</th>
+              <th>Priority Score</th>
+            </tr>
+          </thead>
+          <tbody id="queueTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ATC LOG (BOTTOM RIGHT) -->
+    <div class="card log-card">
+      <div class="card-header">
+        <h2>ATC Live Movement Log</h2>
+      </div>
+      <div class="log-box" id="logBox"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:8080/api";
+    const canvas = document.getElementById("airfieldCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Relative node positions normalized from 0.0 to 1.0 so nothing ever clips
+    const nodeNormalized = {
+      0: { nx: 0.12, ny: 0.50, label: "Runway-A" },
+      1: { nx: 0.40, ny: 0.50, label: "Taxiway-Alpha" },
+      2: { nx: 0.65, ny: 0.25, label: "Taxiway-Beta" },
+      3: { nx: 0.88, ny: 0.75, label: "Gate-10" },
+      4: { nx: 0.88, ny: 0.25, label: "Gate-12" }
+    };
+
+    let edges = [];
+    let activePath = [];
+
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      drawGraph();
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    function log(msg, isAlert = false) {
+      const box = document.getElementById("logBox");
+      const div = document.createElement("div");
+      div.className = "log-item" + (isAlert ? " alert" : "");
+      div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      box.prepend(div);
+    }
+
+    async function fetchState() {
+      try {
+        const res = await fetch(`${API_BASE}/state`);
+        const data = await res.json();
+        
+        // Render Queue
+        const tbody = document.getElementById("queueTableBody");
+        tbody.innerHTML = "";
+        data.queue.forEach((f) => {
+          const row = document.createElement("tr");
+          if (f.emergency > 5) row.className = "critical-row";
+          row.innerHTML = `
+            <td><strong>${f.id}</strong> ${f.emergency > 5 ? '🚨' : ''}</td>
+            <td>${f.fuel}m</td>
+            <td>${f.delay}m</td>
+            <td>${f.passengers}</td>
+            <td>${f.priority.toFixed(1)}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        edges = data.edges;
+        drawGraph();
+      } catch (err) {
+        log("Backend offline. Make sure './server' or 'server.exe' is running.", true);
+      }
+    }
+
+    function getNodePos(id) {
+      const n = nodeNormalized[id];
+      return {
+        x: n.nx * canvas.width,
+        y: n.ny * canvas.height,
+        label: n.label
+      };
+    }
+
+    function drawGraph() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw Edges
+      edges.forEach(e => {
+        const u = getNodePos(e.u);
+        const v = getNodePos(e.v);
+
+        const isHighlighted = activePath.length > 1 && activePath.some((node, i) => 
+          (activePath[i] === e.u && activePath[i+1] === e.v) || (activePath[i] === e.v && activePath[i+1] === e.u)
+        );
+
+        ctx.beginPath();
+        ctx.moveTo(u.x, u.y);
+        ctx.lineTo(v.x, v.y);
+        ctx.lineWidth = isHighlighted ? 5 : (e.isOpen ? 3 : 2);
+        ctx.strokeStyle = isHighlighted ? "#00f0ff" : (e.isOpen ? "#10b981" : "#ef4444");
+        
+        if (!e.isOpen) ctx.setLineDash([6, 6]);
+        else ctx.setLineDash([]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Weight badge
+        const midX = (u.x + v.x) / 2;
+        const midY = (u.y + v.y) / 2;
+        ctx.fillStyle = "#1e293b";
+        ctx.strokeStyle = e.isOpen ? "#10b981" : "#ef4444";
+        ctx.lineWidth = 1;
+        ctx.fillRect(midX - 16, midY - 11, 32, 22);
+        ctx.strokeRect(midX - 16, midY - 11, 32, 22);
+
+        ctx.fillStyle = e.isOpen ? "#a7f3d0" : "#fca5a5";
+        ctx.font = "bold 11px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(e.w + "m", midX, midY);
+      });
+
+      // Draw Nodes
+      for (const [id] of Object.entries(nodeNormalized)) {
+        const pos = getNodePos(id);
+        
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 16, 0, Math.PI * 2);
+        ctx.fillStyle = (id == 0) ? "#0284c7" : ((id >= 3) ? "#f59e0b" : "#6366f1");
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Node Label
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(pos.label, pos.x, pos.y - 24);
+      }
+    }
+
+    // Toggle Edge
+    canvas.addEventListener("click", async (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = ev.clientX - rect.left;
+      const clickY = ev.clientY - rect.top;
+
+      for (const e of edges) {
+        const u = getNodePos(e.u);
+        const v = getNodePos(e.v);
+        const midX = (u.x + v.x) / 2;
+        const midY = (u.y + v.y) / 2;
+        const dist = Math.hypot(clickX - midX, clickY - midY);
+
+        if (dist < 22) {
+          const nextStatus = !e.isOpen;
+          await fetch(`${API_BASE}/toggle-edge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ u: e.u, v: e.v, status: nextStatus })
+          });
+          log(`Taxiway segment [${u.label} <-> ${v.label}] is now ${nextStatus ? 'OPEN' : 'BLOCKED'}!`);
+          fetchState();
+          return;
+        }
+      }
+    });
+
+    async function addOrUpdateFlight() {
+      const payload = {
+        id: document.getElementById("flightId").value.trim(),
+        fuel: parseInt(document.getElementById("fuelTime").value),
+        delay: parseInt(document.getElementById("delayTime").value),
+        passengers: parseInt(document.getElementById("passengers").value),
+        emergency: parseInt(document.getElementById("emergency").value)
+      };
+
+      await fetch(`${API_BASE}/flight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      log(`Flight ${payload.id} added/updated in registry and priority queue.`);
+      fetchState();
+    }
+
+    async function landTopFlight() {
+      const gate = parseInt(document.getElementById("gateSelect").value);
+      const res = await fetch(`${API_BASE}/land`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gate: gate })
+      });
+
+      const data = await res.json();
+      if (data.status === "empty") {
+        log("Runway Queue is empty.", true);
+        return;
+      }
+
+      if (data.cost === -1) {
+        log(`CRITICAL: Flight ${data.flightID} landed on Runway-A, but NO OPEN taxiway path exists to destination gate!`, true);
+        activePath = [];
+      } else {
+        activePath = data.path;
+        const pathNames = data.path.map(id => nodeNormalized[id].label).join(" ➔ ");
+        log(`Flight ${data.flightID} cleared to land! Shortest ground taxi: [${pathNames}] (${data.cost} mins)`);
+      }
+      drawGraph();
+      fetchState();
+    }
+
+    // Initial setup
+    setTimeout(() => {
+      resizeCanvas();
+      fetchState();
+    }, 100);
+
+    setInterval(fetchState, 3000);
+  </script>
+</body>
+</html>
